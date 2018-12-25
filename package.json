@@ -1,0 +1,15 @@
+{
+  "name": "gravity",
+  "version": "1.0.0",
+  "description": "A simple simulator",
+  "main": "simulator.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Gregory Lazarski",
+  "license": "MIT",
+  "dependencies": {
+    "@babel/standalone": "^7.2.5",
+    "pixi.js": "^4.8.4"
+  }
+}
