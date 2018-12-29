@@ -15,3 +15,14 @@ body
     display: inline-block;
     max-width: 1280px;
 }
+
+.barWrapper
+{
+    width: 100%;
+}
+
+.progressBar
+{
+    height: 16px;
+    background: rgba(120, 120, 255, 1);
+}

@@ -1,47 +1,46 @@
-const DATA = {
-    "bodies": [{
-        "m": 10000.0,
-        "r": 20.0,
-        "x": 0.0,
-        "y": 0.0,
-        "vx": 0.0,
-        "vy": 0.0,
-    }, {
-        "m": 2.0,
-        "r": 5.0,
-        "x": 100.0,
-        "y": 0.0,
-        "vx": 0.0,
-        "vy": 10.0,
-    }, {
-        "m": 2.0,
-        "r": 5.0,
-        "x": 100.0,
-        "y": 0.0,
-        "vx": 5.0,
-        "vy": 10.0,
-    }, {
-        "m": 2.0,
-        "r": 5.0,
-        "x": 50.0,
-        "y": 50.0,
-        "vx": -5.0,
-        "vy": -10.0,
-    }]
-};
-
 // const DATA = {
 //     "bodies": [{
-//         "m": 2.0,
+//         "m": 10000.0,
 //         "r": 20.0,
-//         "x": 100.0,
-//         "y": 100.0,
+//         "x": 0.0,
+//         "y": 0.0,
 //         "vx": 0.0,
 //         "vy": 0.0,
+//         "fix": true
+//     }, {
+//         "m": 2.0,
+//         "r": 5.0,
+//         "x": 100.0,
+//         "y": 0.0,
+//         "vx": 0.0,
+//         "vy": 10.0,
+//     }, {
+//         "m": 2.0,
+//         "r": 5.0,
+//         "x": 100.0,
+//         "y": 0.0,
+//         "vx": 5.0,
+//         "vy": 10.0,
+//     }, {
+//         "m": 2.0,
+//         "r": 5.0,
+//         "x": 50.0,
+//         "y": 50.0,
+//         "vx": -5.0,
+//         "vy": -10.0,
 //     }]
 // };
 
-const GEE = 1.0;
+const DATA = {
+    "bodies": [{
+        "m": 2.0,
+        "r": 20.0,
+        "x": 100.0,
+        "y": 100.0,
+        "vx": 0.0,
+        "vy": 0.0,
+    }]
+};
 
 // The application will create a renderer using WebGL, if possible,
 // with a fallback to a canvas render. It will also setup the ticker
@@ -66,145 +65,197 @@ class Body {
     }
 }
 
-function generateCircle(radius) {
+function generateCircleSprite(radius, withColor) {
     var circle = new PIXI.Graphics();
-    circle.beginFill(parseInt(randomColor().slice(1), 16));
+    if (!withColor) circle.beginFill(parseInt(randomColor().slice(1), 16));
+    else circle.beginFill(withColor);
     circle.drawCircle(0, 0, radius);
     circle.endFill();
     return new PIXI.Sprite(circle.generateCanvasTexture(1.0, 1.0));
 }
 
 class Simulation {
+
     constructor(rawBodies) {
         this.bodies = [];
         this.dt = 0.0001;
         this.saveInterval = 1.0;
+        this.gee = 1.0;
 
-        var maxMass = 0.0;
+        this.trajectory = [];
+        this.sprites = [];
+
+        this.generating = false;
+
+        this.currentDisplayedFrame = 0;
+
+        this.simulationWorker = new Worker('simulation_worker.js');
+
+        this.simulationWorker.addEventListener("message", (message) => {
+                console.log(message.data);
+                if (message.data.result == "complete") {
+                    this.generating = false;
+                    this.trajectory = this.trajectory.concat(message.data
+                        .trajectory);
+                    //alert("Simulation complete");
+                } else if (message.data.result == "frameTick") {
+                    document.getElementsByClassName("progressBar")[0].style
+                        .width =
+                        message.data.percent;
+
+                }
+            },
+            false);
+
         rawBodies.forEach((rawBody) => {
             var b = Body.fromJson(rawBody);
             b.x += app.screen.width / 2;
             b.y += app.screen.height / 2;
-            let sprite = generateCircle(b.r);
+            let sprite = generateCircleSprite(b.r);
             sprite.width = sprite.height = 2 * b.r;
             sprite.anchor.set(0.5);
             sprite.x = b.x;
             sprite.y = b.y;
-            this.bodies.push({
-                "body": b,
-                "sprite": sprite
-            });
+            this.bodies.push(b);
+            this.sprites.push(sprite);
             console.log(`Body: x:${b.x} y:${b.y}`);
             app.stage.addChild(sprite);
-            if ((maxMass < b.m)) maxMass = b.m;
 
         });
 
-        this.bodies.forEach((bodyDupe) => {
-            bodyDupe.body.fix = bodyDupe.body.m == maxMass;
+        this.trajectory.push(JSON.parse(JSON.stringify(this.bodies)));
+        document.getElementById("currentFrameCounter").value = (this.currentDisplayedFrame);
+
+    }
+
+    setFrame(frameNumber) {
+        if (this.trajectory.length <= frameNumber) {
+            this.dispatchGenerate(frameNumber);
+        } else {
+            let theFrame = this.trajectory[frameNumber];
+            theFrame.forEach((body, idex) => {
+                let sprite = this.sprites[idex];
+                sprite.x = body.x;
+                sprite.y = body.y;
+            });
+            this.currentDisplayedFrame = frameNumber;
+        }
+    }
+
+    simulateFrames(frames) {
+        this.simulationWorker.postMessage({
+
+            mode: "precompute",
+            dt: this.dt,
+            saveInterval: this.saveInterval,
+            frameCount: frames,
+            bodies: this.trajectory[this.trajectory.length - 1],
+            gee: this.gee
+
         });
     }
 
-    tickSimulation() {
-
-        for (var i = 0; i < this.saveInterval / this.dt; i++) {
-            // Increment positions due to velocities
-            this.bodies.forEach((bodyObj) => {
-                var b = bodyObj.body;
-                if (b.fix) return;
-                var s = bodyObj.sprite;
-                b.x = b.x + b.vx * this.dt;
-                b.y = b.y + b.vy * this.dt;
-
-                s.x = b.x;
-                s.y = b.y;
-
-                //console.log(`${b.vx} ${b.vy}`);
-            });
-
-            //Compute accelerations. Indices are i and j to be consistent with notes
-
-            this.bodies.forEach((bodyObj) => {
-                var i = bodyObj.body;
-                if (i.fix) return;
-                var ax = 0.0,
-                    ay = 0.0;
-
-                this.bodies.forEach((bodyObj2) => {
-                    var j = bodyObj2.body;
-                    if (i == j) return;
-                    let dx = i.x - j.x;
-                    let dy = i.y - j.y;
-                    let dxy = Math.abs(dx * dx * dx) +
-                        Math
-                        .abs(dy * dy * dy);
-
-                    let radsum = i.r + j.r;
-                    if ((dx * dx + dy * dy) <=
-                        radsum *
-                        radsum) {
-                        // let tan = Math.atan2(dx, dy)
-                        // let dm = i.m - j.m;
-                        // let am = (i.m + j.ml) * this.dt;
-                        // ax += (dm * i.vx + 2 * j.m * j.vx) /
-                        //     am;
-                        // ay += (dm * i.vy + 2 * j.m * j.vy) /
-                        //     am;
-                    } else {
-                        ax += j.m * dx / dxy;
-                        ay += j.m * dy / dxy;
-                    }
-                });
-                ax *= -GEE;
-                ay *= -GEE;
-                //console.log(`${ax} ${ay}`);
-                if (ax) i.vx += ax * this.dt;
-                if (ay) i.vy += ay * this.dt;
-            });
-        }
-
-
-
+    dispatchGenerate(upTo) {
+        this.generating = true;
+        app.simulation.simulateFrames(upTo - app.simulation.trajectory.length);
     }
 }
 
-console.log(JSON.stringify(new Body(2.0, 1.0)));
-
 // The application will create a canvas element for you that you
 // can then insert into the DOM
-document.body.appendChild(app.view);
+document.getElementById("bigWrapper").getElementsByClassName("canvasWrapper")[0]
+    .appendChild(
+        app.view);
 
-// load the texture we need
-PIXI.loader.add('config', 'bodies.json').load((loader, resources) => {
-    // This creates a texture from a 'bunny.png' image
-    //let cfg = resources.config
-    let cfg = DATA;
-    app.simulation = new Simulation(cfg.bodies);
+let cfg = DATA;
+app.simulation = new Simulation(cfg.bodies);
+app.isPlaying = false;
 
-    console.log(app.simulation);
+// app.ticker.add(() => {
+//     app.simulation.tickSimulation();
+// });
 
-    // app.stage.interactive = true;
-    // app.stage.on('click', function(e) {
-    //     console.log("t");
-    // });
+function onCanvasClick() {
+    app.simulation.tickSimulation();
+}
 
-    // // Setup the position of the bunny
-    // bunny.x = app.renderer.width / 2;
-    // bunny.y = app.renderer.height / 2;
-    //
-    // // Rotate around the center
-    // bunny.anchor.x = 0.5;
-    // bunny.anchor.y = 0.5;
-    //
-    // // Add the bunny to the scene we are building
-    // app.stage.addChild(bunny);
-    //
-    // // Listen for frame updates
-    app.ticker.add(() => {
-        app.simulation.tickSimulation();
-    });
+function tickApp() {
+    if (app.isPlaying) {
+        app.simulation.setFrame((parseInt(app.simulation.currentDisplayedFrame) +
+                1) %
+            app.simulation.trajectory
+            .length);
+        document.getElementById("currentFrameCounter").value = (app.simulation.currentDisplayedFrame);
+    }
+}
+
+app.ticker.add(tickApp);
+
+function playAnimation() {
+    if (app.isPlaying) {
+        app.isPlaying = false;
+    } else {
+        app.isPlaying = true;
+    }
+
+
+}
+
+function precomputeFrames() {
+    let valueInput = document.getElementById(
+        "totalFrames");
+    app.simulation.dispatchGenerate(parseInt(valueInput.value));
+}
+
+document.getElementById("currentFrameCounter").addEventListener('input', (e) => {
+    var value = parseInt(e.target.value);
+    if (value > app.simulation.trajectory.length - 1) {
+        value = app.simulation.trajectory.length - 1;
+    } else if (value < 0) {
+        value = 0;
+    }
+    e.target.value = value;
+
+    app.simulation.setFrame(value);
 });
 
-function doStuff() {
-    app.simulation.tickSimulation();
+function downloadTrajectory() {
+    var obj = {
+        dt: app.simulation.dt,
+        saveInterval: app.simulation.saveInterval,
+        gee: app.simulation.gee,
+        trajectory: app.simulation.trajectory
+    };
+    download(JSON.stringify(obj, null, 2), "Simulation.json",
+        "text/json");
+}
+
+function upload() {
+
+    let files = document.getElementById("fileUp").files;
+    if (files && files.length > 0) {
+        let reader = new FileReader();
+        reader.onload = (evt) => {
+            console.log(evt);
+            var theFile = JSON.parse(evt.target.result);
+            if (theFile) {
+                for (let i = app.stage.children.length - 1; i >= 0; i--) {
+                    app.stage.removeChild(app.stage.children[i]);
+                }
+                let bodies = theFile.bodies ? theFile.bodies : theFile.trajectory[
+                    0];
+                let sim = new Simulation(bodies);
+                Object.assign(sim, theFile);
+                console.log(sim);
+                app.simulation = sim;
+                sim.setFrame(0);
+            } else {
+                alert("Malformed Json");
+            }
+        };
+        reader.readAsText(files[0]);
+
+    } else {
+        alert("Select a simulation file");
+    }
 }

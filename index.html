@@ -5,14 +5,31 @@
         <link rel="stylesheet" href="css/main.css">
         <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/4.5.1/pixi.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/pixi-filters@2.6.1/dist/pixi-filters.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/randomcolor/0.5.2/randomColor.min.js" charset="utf-8"></script>
+        <!-- <script src="local_libs/babel.min.js"></script>
+        <script src="local_libs/pixi.min.js"></script>
+        <script src="local_libs/pixi-filters.js"></script>
+        <script src="local_libs/randomColor.min.js" charset="utf-8"></script> -->
+        <script src="http://danml.com/js/download2.js" charset="utf-8"></script>
         <script type="text/babel" src="simulator.js" charset="utf-8"></script>
         <title>Gravity</title>
     </head>
-    <body onClick="doStuff()">
-        <!-- <div id="bigWrapper">
-            <canvas id="canvas" width="1280" height="800"></canvas>
-        </div> -->
+    <body>
+        <div id="bigWrapper">
+            <div class="canvasWrapper"></div>
+            <div class="controls">
+                <button type="button" name="play" onClick="playAnimation()">Play</button>
+                <input type="number" name="currentFrame" id="currentFrameCounter" value="0">
+                <input type="number" name="finalFrame" id="totalFrames" value="100">
+                <button type="button" name="precompute" onClick="precomputeFrames()" >Precompute Frames</button>
+                <button type="button" name="dl" onClick="downloadTrajectory()" >Download Simulation</button>
+                <input type="file" id="fileUp" multiple="false"/>
+                <button type="button" name="ul" onClick="upload()" >Upload Simulation</button>
+                <br>
+                <div class="barWrapper">
+                    <div class="progressBar"></div>
+                </div>
+            </div>
+    </div>
     </body>
 </html>
