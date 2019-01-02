@@ -1,46 +1,46 @@
-// const DATA = {
-//     "bodies": [{
-//         "m": 10000.0,
-//         "r": 20.0,
-//         "x": 0.0,
-//         "y": 0.0,
-//         "vx": 0.0,
-//         "vy": 0.0,
-//         "fix": true
-//     }, {
-//         "m": 2.0,
-//         "r": 5.0,
-//         "x": 100.0,
-//         "y": 0.0,
-//         "vx": 0.0,
-//         "vy": 10.0,
-//     }, {
-//         "m": 2.0,
-//         "r": 5.0,
-//         "x": 100.0,
-//         "y": 0.0,
-//         "vx": 5.0,
-//         "vy": 10.0,
-//     }, {
-//         "m": 2.0,
-//         "r": 5.0,
-//         "x": 50.0,
-//         "y": 50.0,
-//         "vx": -5.0,
-//         "vy": -10.0,
-//     }]
-// };
-
 const DATA = {
     "bodies": [{
-        "m": 2.0,
+        "m": 10000.0,
         "r": 20.0,
-        "x": 100.0,
-        "y": 100.0,
+        "x": 0.0,
+        "y": 0.0,
         "vx": 0.0,
         "vy": 0.0,
+        "fix": true
+    }, {
+        "m": 2.0,
+        "r": 5.0,
+        "x": 100.0,
+        "y": 0.0,
+        "vx": 0.0,
+        "vy": 10.0,
+    }, {
+        "m": 2.0,
+        "r": 5.0,
+        "x": 100.0,
+        "y": 0.0,
+        "vx": 5.0,
+        "vy": 10.0,
+    }, {
+        "m": 2.0,
+        "r": 5.0,
+        "x": 50.0,
+        "y": 50.0,
+        "vx": -5.0,
+        "vy": -10.0,
     }]
 };
+
+// const DATA = {
+//     "bodies": [{
+//         "m": 2.0,
+//         "r": 20.0,
+//         "x": 100.0,
+//         "y": 100.0,
+//         "vx": 0.0,
+//         "vy": 0.0,
+//     }]
+// };
 
 // The application will create a renderer using WebGL, if possible,
 // with a fallback to a canvas render. It will also setup the ticker
@@ -107,20 +107,42 @@ class Simulation {
             },
             false);
 
+        var baryX, baryY, totalMass;
+        baryX = baryY = totalMass = 0;
+
+
         rawBodies.forEach((rawBody) => {
             var b = Body.fromJson(rawBody);
-            b.x += app.screen.width / 2;
-            b.y += app.screen.height / 2;
+            if (b.m == 0.0) return;
+            // b.x += app.screen.width / 2;
+            // b.y += app.screen.height / 2;
             let sprite = generateCircleSprite(b.r);
             sprite.width = sprite.height = 2 * b.r;
             sprite.anchor.set(0.5);
-            sprite.x = b.x;
-            sprite.y = b.y;
+            baryX += b.x * b.m;
+            baryY += b.y * b.m;
+            totalMass += b.m;
+            // sprite.x = b.x;
+            // sprite.y = b.y;
             this.bodies.push(b);
             this.sprites.push(sprite);
             console.log(`Body: x:${b.x} y:${b.y}`);
             app.stage.addChild(sprite);
 
+        });
+
+        baryX /= totalMass;
+        baryY /= totalMass;
+
+        baryX += app.screen.width / 2;
+        baryY += app.screen.height / 2;
+
+        this.bodies.forEach((body, idex) => {
+            body.x += baryX;
+            body.y += baryY;
+            let sprite = this.sprites[idex];
+            sprite.x = body.x;
+            sprite.y = body.y;
         });
 
         this.trajectory.push(JSON.parse(JSON.stringify(this.bodies)));
