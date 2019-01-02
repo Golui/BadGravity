@@ -8,14 +8,14 @@ const DATA = {
         "vy": 0.0,
         "fix": true
     }, {
-        "m": 2.0,
+        "m": 20.0,
         "r": 5.0,
-        "x": 100.0,
+        "x": 120.0,
         "y": 0.0,
         "vx": 0.0,
-        "vy": 10.0,
+        "vy": -10.0,
     }, {
-        "m": 2.0,
+        "m": 20.0,
         "r": 5.0,
         "x": 100.0,
         "y": 0.0,
@@ -23,7 +23,7 @@ const DATA = {
         "vy": 10.0,
     }, {
         "m": 2.0,
-        "r": 5.0,
+        "r": 3.0,
         "x": 50.0,
         "y": 50.0,
         "vx": -5.0,
@@ -65,10 +65,14 @@ class Body {
     }
 }
 
+function hexString2Int(str) {
+    return parseInt(str.slice(1), 16);
+}
+
 function generateCircleSprite(radius, withColor) {
     var circle = new PIXI.Graphics();
-    if (!withColor) circle.beginFill(parseInt(randomColor().slice(1), 16));
-    else circle.beginFill(withColor);
+    if (!withColor) circle.beginFill(hexString2Int(randomColor()));
+    else circle.beginFill(hexString2Int(withColor));
     circle.drawCircle(0, 0, radius);
     circle.endFill();
     return new PIXI.Sprite(circle.generateCanvasTexture(1.0, 1.0));
@@ -79,7 +83,7 @@ class Simulation {
     constructor(rawBodies) {
         this.bodies = [];
         this.dt = 0.0001;
-        this.saveInterval = 1.0;
+        this.saveEach = 10000;
         this.gee = 1.0;
 
         this.trajectory = [];
@@ -116,7 +120,7 @@ class Simulation {
             if (b.m == 0.0) return;
             // b.x += app.screen.width / 2;
             // b.y += app.screen.height / 2;
-            let sprite = generateCircleSprite(b.r);
+            let sprite = generateCircleSprite(b.r, b.color);
             sprite.width = sprite.height = 2 * b.r;
             sprite.anchor.set(0.5);
             baryX += b.x * b.m;
@@ -134,17 +138,16 @@ class Simulation {
         baryX /= totalMass;
         baryY /= totalMass;
 
-        baryX += app.screen.width / 2;
-        baryY += app.screen.height / 2;
+        baryX -= app.screen.width / 2;
+        baryY -= app.screen.height / 2;
 
         this.bodies.forEach((body, idex) => {
-            body.x += baryX;
-            body.y += baryY;
+            body.x -= baryX;
+            body.y -= baryY;
             let sprite = this.sprites[idex];
             sprite.x = body.x;
             sprite.y = body.y;
         });
-
         this.trajectory.push(JSON.parse(JSON.stringify(this.bodies)));
         document.getElementById("currentFrameCounter").value = (this.currentDisplayedFrame);
 
@@ -169,7 +172,7 @@ class Simulation {
 
             mode: "precompute",
             dt: this.dt,
-            saveInterval: this.saveInterval,
+            saveEach: this.saveEach,
             frameCount: frames,
             bodies: this.trajectory[this.trajectory.length - 1],
             gee: this.gee
@@ -190,7 +193,7 @@ document.getElementById("bigWrapper").getElementsByClassName("canvasWrapper")[0]
         app.view);
 
 let cfg = DATA;
-app.simulation = new Simulation(cfg.bodies);
+newSimFromJson(JSON.stringify(cfg));
 app.isPlaying = false;
 
 // app.ticker.add(() => {
@@ -242,14 +245,43 @@ document.getElementById("currentFrameCounter").addEventListener('input', (e) => 
 });
 
 function downloadTrajectory() {
-    var obj = {
-        dt: app.simulation.dt,
-        saveInterval: app.simulation.saveInterval,
-        gee: app.simulation.gee,
-        trajectory: app.simulation.trajectory
-    };
-    download(JSON.stringify(obj, null, 2), "Simulation.json",
+    download(JSON.stringify(obj, (
+            k,
+            v) => {
+            if (["sprites", "simulationWorker",
+                    "currentDisplayedFrame", "generating"
+                ].includes(k)) return undefined;
+            else return v;
+        }, 2), "Simulation.json",
         "text/json");
+}
+
+function newSimFromJson(rawJson) {
+    var theFile = JSON.parse(rawJson);
+    if (theFile) {
+        for (let i = app.stage.children.length - 1; i >= 0; i--) {
+            app.stage.removeChild(app.stage.children[i]);
+        }
+        let bodies = theFile.bodies ? theFile.bodies : theFile.trajectory[
+            0];
+        let sim = new Simulation(bodies);
+        Object.assign(sim, theFile);
+        console.log(sim);
+        app.simulation = sim;
+        sim.setFrame(0);
+    } else {
+        alert("Malformed Json");
+    }
+
+    document.getElementById("simJson").value = JSON.stringify(app.simulation, (
+        k,
+        v) => {
+        if (["sprites", "trajectory", "simulationWorker",
+                "currentDisplayedFrame", "generating"
+            ].includes(k)) return undefined;
+        else return v;
+    }, 2);
+
 }
 
 function upload() {
@@ -259,25 +291,15 @@ function upload() {
         let reader = new FileReader();
         reader.onload = (evt) => {
             console.log(evt);
-            var theFile = JSON.parse(evt.target.result);
-            if (theFile) {
-                for (let i = app.stage.children.length - 1; i >= 0; i--) {
-                    app.stage.removeChild(app.stage.children[i]);
-                }
-                let bodies = theFile.bodies ? theFile.bodies : theFile.trajectory[
-                    0];
-                let sim = new Simulation(bodies);
-                Object.assign(sim, theFile);
-                console.log(sim);
-                app.simulation = sim;
-                sim.setFrame(0);
-            } else {
-                alert("Malformed Json");
-            }
+            newSimFromJson(evt.target.result);
         };
         reader.readAsText(files[0]);
 
     } else {
         alert("Select a simulation file");
     }
+}
+
+function setFromText() {
+    newSimFromJson(document.getElementById("simJson").value);
 }

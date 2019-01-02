@@ -10,7 +10,7 @@ function tickFrames(message) {
 
     console.log(message.data);
     let dt = message.data.dt;
-    let saveInterval = message.data.saveInterval;
+    let saveEach = message.data.saveEach;
     let bodies = message.data.bodies;
     let gee = message.data.gee;
     let frameCount = message.data.frameCount;
@@ -19,7 +19,7 @@ function tickFrames(message) {
 
     for (let frame = 0; frame < frameCount; frame++) {
 
-        bodies = tickFrame(saveInterval, dt, gee, bodies);
+        bodies = tickFrame(saveEach, dt, gee, bodies);
 
         self.postMessage({
             result: "frameTick",
@@ -34,8 +34,8 @@ function tickFrames(message) {
     });
 }
 
-function tickFrame(saveInterval, dt, gee, bodies) {
-    for (let step = 0; step < saveInterval / dt; step++) {
+function tickFrame(saveEach, dt, gee, bodies) {
+    for (let step = 0; step < saveEach; step++) {
         // Increment positions due to velocities
         bodies.forEach((b) => {
             if (b.fix) return;
@@ -88,5 +88,5 @@ function tickFrame(saveInterval, dt, gee, bodies) {
         });
     }
 
-    return bodies
+    return bodies;
 }
